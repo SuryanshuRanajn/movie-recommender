@@ -5,12 +5,19 @@ from dotenv import load_dotenv
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.decomposition import TruncatedSVD
-import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # ---------- Load environment variables ----------
 load_dotenv()
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
+
+# On Streamlit Cloud, secrets aren't always exposed via os.getenv().
+# Fall back to st.secrets if the key wasn't found locally.
+if not TMDB_API_KEY:
+    try:
+        import streamlit as st
+        TMDB_API_KEY = st.secrets["TMDB_API_KEY"]
+    except Exception:
+        TMDB_API_KEY = None
 
 # ---------- Load data ----------
 movies = pd.read_csv('data/movies.csv')
@@ -59,6 +66,9 @@ def get_movie_details(title):
     """Fetch poster URL, overview, and rating for a movie title using the TMDB API.
     Matches by release year (extracted from the MovieLens title) to avoid picking
     the wrong movie when a franchise has multiple entries (e.g. Toy Story 1-5)."""
+    if not TMDB_API_KEY:
+        return {"poster": None, "overview": "No description available.", "rating": "N/A"}
+
     # "Toy Story (1995)" -> clean_title="Toy Story", year="1995"
     if ' (' in title and title.endswith(')'):
         clean_title = title.rsplit(' (', 1)[0]
@@ -80,7 +90,7 @@ def get_movie_details(title):
         if not results and year:
             # Retry without the year filter in case it was too strict
             params.pop("year", None)
-            response = requests.get(url, params=params, timeout=15, verify=False)
+            response = requests.get(url, params=params, timeout=15)
             results = response.json().get("results")
 
         if results:
@@ -101,5 +111,3 @@ def get_movie_details(title):
         print(f"Error fetching details for {title}: {e}")
 
     return {"poster": None, "overview": "No description available.", "rating": "N/A"}
-if __name__ == "__main__":
-    print(get_movie_details("Toy Story (1995)"))
