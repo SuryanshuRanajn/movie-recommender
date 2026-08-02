@@ -1,4 +1,5 @@
 import streamlit as st
+import os
 from recommender import (
     get_content_recommendations,
     get_collaborative_recommendations,
@@ -16,6 +17,16 @@ def get_movie_details(title):
 
 # ---------- Page config ----------
 st.set_page_config(page_title="CineMatch", page_icon="🎬", layout="wide")
+
+# ---------- TEMPORARY DEBUG LINE - remove after confirming key loads ----------
+key_found_env = bool(os.getenv("TMDB_API_KEY"))
+key_found_secrets = False
+try:
+    key_found_secrets = "TMDB_API_KEY" in st.secrets
+except Exception:
+    pass
+st.write(f"DEBUG — key via os.getenv: {key_found_env} | key via st.secrets: {key_found_secrets}")
+# ---------- END DEBUG LINE ----------
 
 # ---------- Netflix-style CSS ----------
 st.markdown("""
