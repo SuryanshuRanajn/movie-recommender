@@ -63,11 +63,13 @@ def get_collaborative_recommendations(user_id, n=10):
 
 # ---------- TMDB Poster + Description Fetching ----------
 def get_movie_details(title):
-    """Fetch poster URL, overview, and rating for a movie title using the TMDB API."""
+    """Fetch poster URL, overview, rating, and TMDB page link for a movie title.
+    Matches by release year (extracted from the MovieLens title) to avoid picking
+    the wrong movie when a franchise has multiple entries (e.g. Toy Story 1-5)."""
     if not TMDB_API_KEY:
-        print(f"DEBUG: No API key available for {title}")
-        return {"poster": None, "overview": "No description available.", "rating": "N/A"}
+        return {"poster": None, "overview": "No description available.", "rating": "N/A", "url": None}
 
+    # "Toy Story (1995)" -> clean_title="Toy Story", year="1995"
     if ' (' in title and title.endswith(')'):
         clean_title = title.rsplit(' (', 1)[0]
         year = title.rsplit(' (', 1)[1].rstrip(')')
@@ -82,18 +84,17 @@ def get_movie_details(title):
 
     try:
         response = requests.get(url, params=params, timeout=15)
-        print(f"DEBUG: {title} -> status_code={response.status_code}")
         data = response.json()
-        print(f"DEBUG: {title} -> response keys={list(data.keys())}, results_count={len(data.get('results', []))}")
         results = data.get("results")
 
         if not results and year:
+            # Retry without the year filter in case it was too strict
             params.pop("year", None)
             response = requests.get(url, params=params, timeout=15)
             results = response.json().get("results")
-            print(f"DEBUG: {title} -> retry without year, results_count={len(results) if results else 0}")
 
         if results:
+            # Prefer a result whose release year matches exactly
             result = results[0]
             if year:
                 for r in results:
@@ -102,14 +103,13 @@ def get_movie_details(title):
                         break
 
             poster_path = result.get("poster_path")
-            print(f"DEBUG: {title} -> poster_path={poster_path}")
             poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else None
             overview = result.get("overview") or "No description available."
             rating = result.get("vote_average", "N/A")
-            return {"poster": poster_url, "overview": overview, "rating": rating}
-        else:
-            print(f"DEBUG: {title} -> no results found at all")
+            movie_id = result.get("id")
+            tmdb_url = f"https://www.themoviedb.org/movie/{movie_id}" if movie_id else None
+            return {"poster": poster_url, "overview": overview, "rating": rating, "url": tmdb_url}
     except Exception as e:
-        print(f"DEBUG: Error fetching details for {title}: {e}")
+        print(f"Error fetching details for {title}: {e}")
 
-    return {"poster": None, "overview": "No description available.", "rating": "N/A"}
+    return {"poster": None, "overview": "No description available.", "rating": "N/A", "url": None}
